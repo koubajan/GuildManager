@@ -1,5 +1,5 @@
 import tkinter as tk
-from tkinter import ttk, messagebox, simpledialog, filedialog
+from tkinter import ttk, messagebox, filedialog
 from models import Hero, GuildManager
 
 class App(tk.Tk):
@@ -62,15 +62,48 @@ class App(tk.Tk):
             messagebox.showerror("DB err:", str(e))
 
     def add_hero(self):
-        # Input dialog for new hero
-        name = simpledialog.askstring("New Hero", "Name:")
-        if name:
-            try:
-                GuildManager.create_hero_with_starter_pack(name, 1)
-                messagebox.showinfo("OK", "Hero created!")
-                self.load_heroes()
-            except Exception as e:
-                messagebox.showerror("Error", str(e))
+        # Custom window for inputting Name, Level, and Gold
+        popup = tk.Toplevel(self)
+        popup.title("New Hero Details")
+        popup.geometry("300x250")
+
+        # 1. Name Input
+        tk.Label(popup, text="Hero Name:").pack(pady=5)
+        entry_name = tk.Entry(popup)
+        entry_name.pack(pady=5)
+
+        # 2. Level Input
+        tk.Label(popup, text="Level (1-100):").pack(pady=5)
+        entry_level = tk.Entry(popup)
+        entry_level.insert(0, "1") # Default value
+        entry_level.pack(pady=5)
+
+        # 3. Gold Input
+        tk.Label(popup, text="Starting Gold:").pack(pady=5)
+        entry_gold = tk.Entry(popup)
+        entry_gold.insert(0, "100.0") # Default value
+        entry_gold.pack(pady=5)
+
+        # Save Function
+        def submit():
+            name = entry_name.get()
+            level = entry_level.get()
+            gold = entry_gold.get()
+
+            if name:
+                try:
+                    # Calls the updated model method with 4 arguments
+                    GuildManager.create_hero_with_starter_pack(name, 1, level, gold)
+                    messagebox.showinfo("OK", "Hero created successfully!")
+                    popup.destroy() # Close popup
+                    self.load_heroes() # Refresh table
+                except Exception as e:
+                    messagebox.showerror("Error", str(e))
+            else:
+                messagebox.showwarning("Warning", "Name is required!")
+
+        # Confirm Button
+        tk.Button(popup, text="Create Hero", command=submit).pack(pady=20)
 
     def show_report(self):
         # Displays aggregated report

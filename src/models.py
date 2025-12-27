@@ -12,10 +12,10 @@ class Item(ActiveRecord):
 
 class GuildManager:
     @staticmethod
-    def create_hero_with_starter_pack(name, class_id):
+    def create_hero_with_starter_pack(name, class_id, level, gold):
         conn = Database.get_connection()
 
-        # Safety: rollback any stuck transaction
+        # Safety: rollback any stuck transaction (doesn't work without it idk why)
         try:
             conn.rollback()
         except:
@@ -26,9 +26,10 @@ class GuildManager:
         try:
             cursor = conn.cursor()
 
-            # 1. Create hero
-            cursor.execute("INSERT INTO heroes (name, class_id, gold_balance, level) VALUES (%s, %s, 100.0, 1)",
-                           (name, class_id))
+            # 1. Create hero with custom Level and Gold
+            sql = "INSERT INTO heroes (name, class_id, gold_balance, level) VALUES (%s, %s, %s, %s)"
+            cursor.execute(sql, (name, class_id, float(gold), int(level)))
+
             hero_id = cursor.lastrowid
 
             # 2. Find starter item
