@@ -1,11 +1,17 @@
 import tkinter as tk
-from tkinter import ttk, messagebox, filedialog
+from tkinter import ttk, messagebox, simpledialog, filedialog
+import json
+import os
 from models import Hero, GuildManager
 
 
 class App(tk.Tk):
     def __init__(self):
         super().__init__()
+
+        # Load config to fill the Settings tab later
+        self.config_data = self.load_config_data()
+
         self.title("Guild Master - D2")
         self.geometry("900x600")
 
@@ -15,6 +21,18 @@ class App(tk.Tk):
         self.create_hero_tab()
         self.create_report_tab()
         self.create_settings_tab()
+
+    def load_config_data(self):
+        # Helper to read raw JSON config safely
+        base_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+        config_path = os.path.join(base_dir, 'config.json')
+        if os.path.exists(config_path):
+            try:
+                with open(config_path, 'r') as f:
+                    return json.load(f)
+            except:
+                return {}
+        return {}
 
     def create_hero_tab(self):
         frame = ttk.Frame(self.notebook)
@@ -52,12 +70,52 @@ class App(tk.Tk):
         ttk.Button(frame, text="Import sample item JSON", command=self.import_json).pack(pady=10)
 
     def create_settings_tab(self):
+        # EDITABLE CONFIGURATION TAB
         frame = ttk.Frame(self.notebook)
-        self.notebook.add(frame, text="Info")
-        ttk.Label(frame, text="Config file: config.json located in root folder.").pack(pady=20)
+        self.notebook.add(frame, text="Settings")
+
+        tk.Label(frame, text="Database Configuration (config.json)", font=("Arial", 12, "bold")).pack(pady=15)
+
+        # Form fields
+        self.entries = {}
+        # Only DB connection fields
+        fields = ["host", "user", "password", "database"]
+
+        for field in fields:
+            row = ttk.Frame(frame)
+            row.pack(fill='x', padx=50, pady=5)
+            tk.Label(row, text=f"{field.upper()}:", width=15, anchor='w').pack(side=tk.LEFT)
+
+            entry = tk.Entry(row)
+            # Fill with current config data
+            entry.insert(0, str(self.config_data.get(field, "")))
+            entry.pack(side=tk.LEFT, fill='x', expand=True)
+
+            # Hide password characters
+            if "password" in field:
+                entry.config(show="*")
+
+            self.entries[field] = entry
+
+        # Save Button
+        ttk.Button(frame, text="Save Configuration", command=self.save_config).pack(pady=20)
+        tk.Label(frame, text="Note: Restart application after saving changes.", fg="red").pack()
+
+    def save_config(self):
+        # Saves new settings to config.json
+        new_config = {field: entry.get() for field, entry in self.entries.items()}
+
+        base_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+        config_path = os.path.join(base_dir, 'config.json')
+
+        try:
+            with open(config_path, 'w') as f:
+                json.dump(new_config, f, indent=4)
+            messagebox.showinfo("Success", "Configuration saved!\nPlease restart the application.")
+        except Exception as e:
+            messagebox.showerror("Error", f"Failed to save config: {e}")
 
     def load_heroes(self):
-        # Reloads data from DB
         try:
             for i in self.tree.get_children():
                 self.tree.delete(i)
@@ -68,7 +126,6 @@ class App(tk.Tk):
             messagebox.showerror("DB Error", str(e))
 
     def get_selected_hero_id(self):
-        # Helper to get ID of the selected row
         selected_item = self.tree.selection()
         if not selected_item:
             messagebox.showwarning("Warning", "Please select a hero first!")
@@ -76,7 +133,6 @@ class App(tk.Tk):
         return self.tree.item(selected_item)['values'][0]
 
     def add_hero(self):
-        # Dialog for creating a new hero
         popup = tk.Toplevel(self)
         popup.title("New Hero")
         popup.geometry("300x250")
@@ -111,7 +167,6 @@ class App(tk.Tk):
         tk.Button(popup, text="Create", command=submit).pack(pady=20)
 
     def delete_hero(self):
-        # Deletes selected hero
         hero_id = self.get_selected_hero_id()
         if hero_id:
             confirm = messagebox.askyesno("Confirm", "Are you sure you want to delete this hero?")
@@ -124,12 +179,10 @@ class App(tk.Tk):
                     messagebox.showerror("Error", str(e))
 
     def edit_hero(self):
-        # Edits selected hero stats
         hero_id = self.get_selected_hero_id()
         if not hero_id:
             return
 
-        # Get current values from the table
         selected_values = self.tree.item(self.tree.selection())['values']
         current_name = selected_values[1]
         current_level = selected_values[2]
@@ -161,7 +214,6 @@ class App(tk.Tk):
         tk.Button(popup, text="Save Changes", command=submit_update).pack(pady=20)
 
     def show_report(self):
-        # Shows aggregated report
         try:
             data = GuildManager.get_report()
             self.report_text.delete(1.0, tk.END)
@@ -173,7 +225,6 @@ class App(tk.Tk):
             messagebox.showerror("Err", str(e))
 
     def import_json(self):
-        # Imports items from JSON file
         file_path = filedialog.askopenfilename(filetypes=[("JSON", "*.json")])
         if file_path:
             try:
