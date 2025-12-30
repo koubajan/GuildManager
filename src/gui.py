@@ -12,7 +12,7 @@ class App(tk.Tk):
         self.config_data = self.load_config_data()
 
         self.title("Guild Master - D2")
-        self.geometry("900x600")
+        self.geometry("900x650")  # made it a bit taller for the new stuff
 
         self.notebook = ttk.Notebook(self)
         self.notebook.pack(fill='both', expand=True)
@@ -39,10 +39,12 @@ class App(tk.Tk):
         btn_frame = ttk.Frame(frame)
         btn_frame.pack(pady=10)
 
+        # added the inventory button here
         ttk.Button(btn_frame, text="New Hero", command=self.add_hero).pack(side=tk.LEFT, padx=5)
+        ttk.Button(btn_frame, text="View Inventory", command=self.view_inventory).pack(side=tk.LEFT, padx=5)
         ttk.Button(btn_frame, text="Edit Stats", command=self.edit_hero).pack(side=tk.LEFT, padx=5)
         ttk.Button(btn_frame, text="Delete Hero", command=self.delete_hero).pack(side=tk.LEFT, padx=5)
-        ttk.Button(btn_frame, text="Refresh Table", command=self.load_heroes).pack(side=tk.LEFT, padx=5)
+        ttk.Button(btn_frame, text="Refresh", command=self.load_heroes).pack(side=tk.LEFT, padx=5)
 
         cols = ('ID', 'Name', 'Level', 'Gold', 'Active')
         self.tree = ttk.Treeview(frame, columns=cols, show='headings')
@@ -58,12 +60,28 @@ class App(tk.Tk):
         frame = ttk.Frame(self.notebook)
         self.notebook.add(frame, text="Report & Import")
 
-        ttk.Button(frame, text="Generate Report", command=self.show_report).pack(pady=10)
-        self.report_text = tk.Text(frame, height=20)
+        # --- REPORT SECTION ---
+        ttk.Label(frame, text="Guild Report", font=("Arial", 10, "bold")).pack(pady=5)
+        ttk.Button(frame, text="Generate Report", command=self.show_report).pack(pady=5)
+
+        self.report_text = tk.Text(frame, height=15)
         self.report_text.pack(fill='x', padx=10)
 
-        ttk.Separator(frame, orient='horizontal').pack(fill='x', pady=10)
-        ttk.Button(frame, text="Import sample item JSON", command=self.import_json).pack(pady=10)
+        # --- IMPORT SECTION (Separated) ---
+        import_frame = ttk.LabelFrame(frame, text="Data Import Zone")
+        import_frame.pack(fill='x', padx=10, pady=20)
+
+        # Import 1: Items
+        i_frame = ttk.Frame(import_frame)
+        i_frame.pack(fill='x', pady=5)
+        ttk.Button(i_frame, text="Import Items (JSON)", command=self.import_json_items).pack(side=tk.LEFT, padx=10)
+        ttk.Label(i_frame, text="Adds new weapons/potions to the game database.").pack(side=tk.LEFT)
+
+        # Import 2: Heroes
+        h_frame = ttk.Frame(import_frame)
+        h_frame.pack(fill='x', pady=5)
+        ttk.Button(h_frame, text="Import Heroes (JSON)", command=self.import_json_heroes).pack(side=tk.LEFT, padx=10)
+        ttk.Label(h_frame, text="Adds new heroes to the roster.").pack(side=tk.LEFT)
 
     def create_settings_tab(self):
         frame = ttk.Frame(self.notebook)
@@ -93,7 +111,6 @@ class App(tk.Tk):
 
     def save_config(self):
         new_config = {field: entry.get() for field, entry in self.entries.items()}
-
         base_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
         config_path = os.path.join(base_dir, 'config.json')
 
@@ -155,6 +172,38 @@ class App(tk.Tk):
 
         tk.Button(popup, text="Create", command=submit).pack(pady=20)
 
+    def view_inventory(self):
+        # NEW: shows what the hero is carrying
+        hero_id = self.get_selected_hero_id()
+        if not hero_id:
+            return
+
+        # grab the hero name for the title
+        selected_values = self.tree.item(self.tree.selection())['values']
+        hero_name = selected_values[1]
+
+        try:
+            items = GuildManager.get_hero_inventory(hero_id)
+
+            # create a popup window
+            popup = tk.Toplevel(self)
+            popup.title(f"Inventory: {hero_name}")
+            popup.geometry("400x300")
+
+            # small table just for items
+            cols = ('Name', 'Rarity', 'Value')
+            inv_tree = ttk.Treeview(popup, columns=cols, show='headings')
+            for c in cols:
+                inv_tree.heading(c, text=c)
+                inv_tree.column(c, width=100)
+            inv_tree.pack(fill='both', expand=True)
+
+            for i in items:
+                inv_tree.insert('', 'end', values=(i['name'], i['rarity'], i['value']))
+
+        except Exception as e:
+            messagebox.showerror("Error", str(e))
+
     def delete_hero(self):
         hero_id = self.get_selected_hero_id()
         if hero_id:
@@ -204,21 +253,15 @@ class App(tk.Tk):
 
     def show_report(self):
         try:
-            # 1. Per-hero report
             data = GuildManager.get_report()
             self.report_text.delete(1.0, tk.END)
-            # UPDATED HEADER: Added Gold and renamed Value to Items Value
             self.report_text.insert(tk.END, "Name | Level | Gold | Items | Items Value\n" + "-" * 55 + "\n")
 
             for row in data:
-                # Handle None values (e.g. if hero has no items)
                 val = row['items_value'] if row['items_value'] is not None else 0.0
-
-                # UPDATED ROW: Added row['gold_balance']
                 self.report_text.insert(tk.END,
                                         f"{row['name']} | {row['level']} | {row['gold_balance']} | {row['item_count']} | {val}\n")
 
-            # 2. Guild summary
             stats = GuildManager.get_guild_stats()
             self.report_text.insert(tk.END, "\n" + "=" * 55 + "\n")
             self.report_text.insert(tk.END, "GUILD TOTAL STATISTICS\n")
@@ -229,7 +272,7 @@ class App(tk.Tk):
         except Exception as e:
             messagebox.showerror("Err", str(e))
 
-    def import_json(self):
+    def import_json_items(self):
         file_path = filedialog.askopenfilename(filetypes=[("JSON", "*.json")])
         if file_path:
             try:
@@ -237,5 +280,18 @@ class App(tk.Tk):
                     content = f.read()
                 c = GuildManager.import_items_from_json(content)
                 messagebox.showinfo("Import", f"Imported {c} items.")
+            except Exception as e:
+                messagebox.showerror("Err", str(e))
+
+    def import_json_heroes(self):
+        # NEW: import logic for heroes
+        file_path = filedialog.askopenfilename(filetypes=[("JSON", "*.json")])
+        if file_path:
+            try:
+                with open(file_path, 'r') as f:
+                    content = f.read()
+                c = GuildManager.import_heroes_from_json(content)
+                messagebox.showinfo("Import", f"Imported {c} heroes.")
+                self.load_heroes()  # refresh the table
             except Exception as e:
                 messagebox.showerror("Err", str(e))
