@@ -1,8 +1,9 @@
-# Guild Master
+# Guild Master - D2
 
 We have recently talked about ERP systems in our Economics classes and I thought why not create a RPG ERP system.
 This is a desktop application for managing an RPG Guild. It allows you to create heroes, manage their inventory, edit the game's item database (shop), and generate reports.
 
+(For more detailed info read the documentation in /docs/Documentation)
 It demonstrates the **Active Record** design pattern, **MySQL** database integration, and **Tkinter** GUI.
 
 ---
